@@ -1,0 +1,12 @@
+version: "2"
+services:
+  web:
+    build: .
+    ports:
+    - "9090:9090"
+    volumes:
+      - data-volume:/data/uploads
+    environment:
+      - STORAGE_PATH=/data/uploads/
+volumes:
+  data-volume:

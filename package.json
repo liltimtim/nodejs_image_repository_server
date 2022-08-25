@@ -1,0 +1,29 @@
+{
+  "name": "img_uploader",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liltimtim/nodejs_mongo_docker_compose_test.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/liltimtim/nodejs_mongo_docker_compose_test/issues"
+  },
+  "homepage": "https://github.com/liltimtim/nodejs_mongo_docker_compose_test#readme",
+  "dependencies": {
+    "body-parser": "^1.20.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.1",
+    "express-fileupload": "^1.4.0",
+    "lodash": "^4.17.21",
+    "morgan": "^1.10.0"
+  }
+}
