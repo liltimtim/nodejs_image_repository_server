@@ -6,7 +6,7 @@ const morgan = require('morgan');
 const _ = require('lodash');
 const FILE_PATH = process.env.STORAGE_PATH || "./uploads"
 const fs = require('fs/promises');
-
+const sharp = require('sharp');
 const app = express();
 
 // enable files upload
@@ -47,11 +47,42 @@ app.get('/collections/:collectionId/:fileId', async (req, res) => {
     const { collectionId, fileId } = req.params
     try {
         let file = await fs.readFile(`${FILE_PATH}/${collectionId}/${fileId}`)
-        res.send(file)
+        const { width, height } = req.query
+        // check to see if query params height and width are given
+        if (width != null && height != null) {
+            try {
+                let resizedImage = await resizeImage(file, width, height)
+                res.send(resizedImage)
+            } catch(error) {
+                res.status(500).json({ error })
+            }
+        } else {
+            res.send(file)
+        }
     } catch {
         res.status(404).send(null)
     }
 })
+/**
+ * 
+ * @param {Buffer} image 
+ * @param {Number} width 
+ * @param {Number} height 
+ * @returns 
+ */
+async function resizeImage(image, width, height) {
+    try {
+        return await sharp(image)
+        .resize({
+            width: Number(width), 
+            height: Number(height),
+            fit: 'inside'
+        })
+        .toBuffer()
+    } catch (error) {
+        throw error
+    }
+}
 
 app.post('/upload-photos/:collectionId', async (req, res) => {
     let { collectionId } = req.params
