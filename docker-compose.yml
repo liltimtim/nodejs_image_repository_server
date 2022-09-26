@@ -8,5 +8,6 @@ services:
       - data-volume:/data/uploads
     environment:
       - STORAGE_PATH=/data/uploads/
+      - LOGGER_URL=http://logger.home.localnet:3100
 volumes:
   data-volume:
