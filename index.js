@@ -8,7 +8,17 @@ const FILE_PATH = process.env.STORAGE_PATH || "./uploads"
 const fs = require('fs/promises');
 const sharp = require('sharp');
 const app = express();
-
+const { createLogger, transports } = require('winston');
+const LokiTransport = require('winston-loki');
+const LOGGER_URL = process.env.LOGGER_URL || "http://logger.home.localnet:3100";
+const options = {
+    transports: [
+        new LokiTransport({
+            host: LOGGER_URL
+        })
+    ]
+}
+const logger = createLogger(options);
 // enable files upload
 app.use(fileUpload({
     createParentPath: true
@@ -26,6 +36,7 @@ const port = process.env.PORT || 9090;
 app.get('/collections', async (req, res) => {
     try {
         let dirs = await fs.readdir(`${FILE_PATH}/`, { withFileTypes: true })
+        logger.debug({ message: `Filepath collections ${FILE_PATH}`, labels : { 'piclog': 'piclog' }})
         res.json( { "dirs": dirs })
     } catch {
         res.status(404).json(null)
@@ -122,8 +133,9 @@ app.post('/upload-photos/:collectionId', async (req, res) => {
     }
 });
 
-app.listen(port, () => 
-  console.log(`App is listening on port ${port}.`)
-);
+app.listen(port, () => {
+    console.log(`App is listening on port ${port}.`)
+    logger.debug(`Application started on port ${port}`)
+});
 
 app.use(express.static('/data-volume/*/*'));
