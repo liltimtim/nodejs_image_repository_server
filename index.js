@@ -8,17 +8,21 @@ const FILE_PATH = process.env.STORAGE_PATH || "./uploads"
 const fs = require('fs/promises');
 const sharp = require('sharp');
 const app = express();
-const { createLogger, transports } = require('winston');
+const { createLogger, transports, format } = require('winston');
 const LokiTransport = require('winston-loki');
 const LOGGER_URL = process.env.LOGGER_URL || "http://logger.home.localnet:3100";
-const options = {
-    transports: [
-        new LokiTransport({
-            host: LOGGER_URL
-        })
-    ]
-}
-const logger = createLogger(options);
+
+const logger = createLogger();
+logger.add(new transports.Console({
+    format: format.json(),
+    level: 'debug'
+}))
+
+logger.add(new LokiTransport({
+    host: LOGGER_URL,
+    json: true,
+    labels: { job: 'image-uploader-logs'}
+}))
 // enable files upload
 app.use(fileUpload({
     createParentPath: true
@@ -36,9 +40,11 @@ const port = process.env.PORT || 9090;
 app.get('/collections', async (req, res) => {
     try {
         let dirs = await fs.readdir(`${FILE_PATH}/`, { withFileTypes: true })
-        logger.debug({ message: `Filepath collections ${FILE_PATH}`, labels : { 'piclog': 'piclog' }})
+        logger.info(`collections query ${FILE_PATH} client: ${req.ip}`)
+        logger.info(req.hostname)
         res.json( { "dirs": dirs })
-    } catch {
+    } catch(err) {
+        logError(err)
         res.status(404).json(null)
     }
 })
@@ -49,6 +55,7 @@ app.get('/collections/:collectionId', async (req, res) => {
         let dirs = await fs.readdir(`${FILE_PATH}/${collectionId}`, { withFileTypes: true })
         res.json({ "result": dirs })
     } catch (err) {
+        logError(err)
         res.status(404).json( { err } )
     }
     
@@ -74,6 +81,15 @@ app.get('/collections/:collectionId/:fileId', async (req, res) => {
         res.status(404).send(null)
     }
 })
+/**
+ * 
+ * @param {Error} err 
+ */
+function logError(err) {
+    logger.error(JSON.stringify(err))
+    logger.error(`error: ${err.name} || message: ${err.message}`)
+}
+
 /**
  * 
  * @param {Buffer} image 
@@ -129,13 +145,14 @@ app.post('/upload-photos/:collectionId', async (req, res) => {
             });
         }
     } catch (err) {
+        logError(err)
         res.status(500).send(err);
     }
 });
 
 app.listen(port, () => {
     console.log(`App is listening on port ${port}.`)
-    logger.debug(`Application started on port ${port}`)
+    logger.info(`Application started on port ${port}`)
 });
 
 app.use(express.static('/data-volume/*/*'));
