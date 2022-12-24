@@ -56,6 +56,40 @@ app.get("/collections", async (req, res) => {
   }
 });
 
+app.get("/weathercollections", async (req, res) => {
+  try {
+    const { condition } = req.query;
+    if (!condition) {
+      throw Error("Query parameter condition required.");
+    }
+    var dirs = {};
+    var foundCollection = "";
+    switch (condition) {
+      case "sun":
+        foundCollection = "Sunny Day";
+        break;
+      case "cloud":
+        foundCollection = "Cloudy Day";
+        break;
+      case "rain":
+        foundCollection = "Rainy Day";
+        break;
+      case "snow":
+        foundCollection = "Snow Day";
+        break;
+      default:
+        throw Error(`Query condition '${condition}' does not exist`);
+    }
+    dirs = await fs.readdir(`${FILE_PATH}/${foundCollection}`, {
+      withFileTypes: true,
+    });
+    return res.json({ result: dirs });
+  } catch (err) {
+    logError(err);
+    res.status(404).json({ error: err.message });
+  }
+});
+
 app.get("/collections/:collectionId", async (req, res) => {
   const { collectionId } = req.params;
   try {
