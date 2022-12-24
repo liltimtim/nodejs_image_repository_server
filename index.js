@@ -83,6 +83,7 @@ app.get("/weathercollections", async (req, res) => {
     dirs = await fs.readdir(`${FILE_PATH}/${foundCollection}`, {
       withFileTypes: true,
     });
+    console.log({ result: dirs, collection: foundCollection });
     return res.json({ result: dirs, collection: foundCollection });
   } catch (err) {
     logError(err);
