@@ -5,8 +5,9 @@ const bodyParser = require("body-parser");
 const morgan = require("morgan");
 const _ = require("lodash");
 const FILE_PATH = process.env.STORAGE_PATH || "./uploads";
+const MUSIC_FILE_PATH = process.env.MUSIC_STORAGE_PATH || "./uploads-music";
 const fs = require("fs/promises");
-const sharp = require("sharp");
+
 const app = express();
 const { createLogger, transports, format } = require("winston");
 const LokiTransport = require("winston-loki");
@@ -64,8 +65,20 @@ const port = process.env.PORT || 9090;
 
 app.get("/collections", async (req, res) => {
   try {
-    let dirs = await fs.readdir(`${FILE_PATH}/`, { withFileTypes: true });
+    let dirs = await getDirs(FILE_PATH);
     logger.info(`collections query ${FILE_PATH} client: ${req.ip}`);
+    logger.info(req.hostname);
+    res.json({ dirs: dirs });
+  } catch (err) {
+    logError(err);
+    res.status(404).json(null);
+  }
+});
+
+app.get("/collections-music", async (req, res) => {
+  try {
+    let dirs = await getDirs(MUSIC_FILE_PATH);
+    logger.info(`collections query ${MUSIC_FILE_PATH} client: ${req.ip}`);
     logger.info(req.hostname);
     res.json({ dirs: dirs });
   } catch (err) {
@@ -112,9 +125,7 @@ app.get("/weathercollections", async (req, res) => {
 app.get("/collections/:collectionId", async (req, res) => {
   const { collectionId } = req.params;
   try {
-    let dirs = await fs.readdir(`${FILE_PATH}/${collectionId}`, {
-      withFileTypes: true,
-    });
+    let dirs = await getDirsCollection(FILE_PATH, collectionId);
     res.json({ result: dirs });
   } catch (err) {
     logError(err);
@@ -122,26 +133,49 @@ app.get("/collections/:collectionId", async (req, res) => {
   }
 });
 
+app.get("/collections-music/:collectionId", async (req, res) => {
+  const { collectionId } = req.params;
+  try {
+    let dirs = await getDirsCollection(MUSIC_FILE_PATH, collectionId);
+    res.json({ result: dirs });
+  } catch (err) {
+    logError(err);
+    res.status(404).json({ err });
+  }
+});
+
+async function getDirsCollection(path, collectionId) {
+  return await fs.readdir(`${path}/${collectionId}`, {
+    withFileTypes: true,
+  });
+}
+
+async function getDirs(path) {
+  return await fs.readdir(`${path}`, { withFileTypes: true });
+}
+
 app.get("/collections/:collectionId/:fileId", async (req, res) => {
   const { collectionId, fileId } = req.params;
   try {
     let file = await fs.readFile(`${FILE_PATH}/${collectionId}/${fileId}`);
-    const { width, height } = req.query;
-    // check to see if query params height and width are given
-    if (width != null && height != null) {
-      try {
-        let resizedImage = await resizeImage(file, width, height);
-        res.send(resizedImage);
-      } catch (error) {
-        res.status(500).json({ error });
-      }
-    } else {
-      res.send(file);
-    }
+    res.send(file);
   } catch {
     res.status(404).send(null);
   }
 });
+
+app.get("/collections-music/:collectionId/:fileId", async (req, res) => {
+  const { collectionId, fileId } = req.params;
+  try {
+    let file = await fs.readFile(
+      `${MUSIC_FILE_PATH}/${collectionId}/${fileId}`
+    );
+    res.send(file);
+  } catch {
+    res.status(404).send(null);
+  }
+});
+
 /**
  *
  * @param {Error} err
@@ -149,27 +183,6 @@ app.get("/collections/:collectionId/:fileId", async (req, res) => {
 function logError(err) {
   logger.error(JSON.stringify(err));
   logger.error(`error: ${err.name} || message: ${err.message}`);
-}
-
-/**
- *
- * @param {Buffer} image
- * @param {Number} width
- * @param {Number} height
- * @returns
- */
-async function resizeImage(image, width, height) {
-  try {
-    return await sharp(image)
-      .resize({
-        width: Number(width),
-        height: Number(height),
-        fit: "inside",
-      })
-      .toBuffer();
-  } catch (error) {
-    throw error;
-  }
 }
 
 app.post("/upload-photos/:collectionId", async (req, res) => {
@@ -181,23 +194,7 @@ app.post("/upload-photos/:collectionId", async (req, res) => {
         message: "No file uploaded",
       });
     } else {
-      let data = [];
-
-      //loop all files
-      _.forEach(_.keysIn(req.files.photos), (key) => {
-        console.log(`uploading ${key}`);
-        let photo = req.files.photos[key];
-        console.log(req.files.photos);
-        //move photo to uploads directory
-        photo.mv(`${FILE_PATH}/${collectionId}/` + photo.name);
-
-        //push file details
-        data.push({
-          name: photo.name,
-          mimetype: photo.mimetype,
-          size: photo.size,
-        });
-      });
+      let data = uploadFile(collectionId, req.files, FILE_PATH);
 
       //return response
       res.send({
@@ -207,10 +204,71 @@ app.post("/upload-photos/:collectionId", async (req, res) => {
       });
     }
   } catch (err) {
+    console.log(err);
     logError(err);
     res.status(500).send(err);
   }
 });
+
+app.post("/upload-music/:collectionId", async (req, res) => {
+  let { collectionId } = req.params;
+  try {
+    if (!req.files) {
+      return res.send({
+        status: false,
+        message: "no files uploaded",
+      });
+    }
+    let data = uploadFile(collectionId, req.files, MUSIC_FILE_PATH);
+    res.send({
+      status: true,
+      message: "Files are uploaded",
+      data: data,
+    });
+  } catch (err) {
+    console.log(err);
+    logError(err);
+    res.status(500).send(err);
+  }
+});
+
+function uploadFile(collectionId, files, filePath) {
+  console.log("Attempting file upload");
+  if (!files) {
+    throw new Error("No file uploaded");
+  }
+  let data = [];
+  // when multiple files come in they come in as an array
+  if (_.isArray(files.files)) {
+    _.forEach(_.keysIn(files.files), (key) => {
+      console.log(`uploading ${key}`);
+      console.log(`=== moving file to directory ${filePath}/${collectionId}/`);
+      let f = files.files[key];
+      console.log(files.files);
+      f.mv(`${filePath}/${collectionId}/` + f.name);
+      data.push({
+        name: f.name,
+        mimetype: f.mimetype,
+        size: f.size,
+      });
+    });
+    return data;
+  }
+  // support uploading single object as well
+  if (_.isObject(files.files)) {
+    console.log("is single object");
+    let f = files.files;
+    console.log(`=== moving file to directory ${filePath}/${collectionId}/`);
+    f.mv(`${filePath}/${collectionId}/` + f.name);
+    data.push({
+      name: f.name,
+      mimetype: f.mimetype,
+      size: f.size,
+    });
+    return data;
+  }
+  return data;
+}
 
 app.listen(port, () => {
   console.log(`App is listening on port ${port}.`);
