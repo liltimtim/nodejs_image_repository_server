@@ -11,6 +11,7 @@ const app = express();
 const { createLogger, transports, format } = require("winston");
 const LokiTransport = require("winston-loki");
 const LOGGER_URL = process.env.LOGGER_URL || "http://logger.home.localnet:3100";
+const promBundle = require("express-prom-bundle");
 
 const logger = createLogger();
 logger.add(
@@ -27,6 +28,23 @@ logger.add(
     labels: { job: "image-uploader-logs" },
   })
 );
+
+const metricsMiddleware = promBundle({
+  includeMethod: true,
+  includePath: true,
+  includeStatusCode: true,
+  includeUp: true,
+  customLabels: {
+    project_name: "zenpic_api",
+    project_type: "zenpic_metric_labels",
+  },
+  promClient: {
+    collectDefaultMetrics: {},
+  },
+});
+
+app.use(metricsMiddleware);
+
 // enable files upload
 app.use(
   fileUpload({
