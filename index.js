@@ -51,6 +51,7 @@ app.use(
   fileUpload({
     createParentPath: true,
     safeFileNames: true,
+    preserveExtension: true,
   })
 );
 
