@@ -5,10 +5,12 @@ services:
     ports:
     - "9090:9090"
     volumes:
-      - data-volume:/data/uploads
+      - /Volumes/store:/data-volume
     environment:
-      - STORAGE_PATH=/data/uploads/
+      - STORAGE_PATH=/data-volume/media
+      - MUSIC_STORAGE_PATH=/data-volume/uploads-music
       - LOGGER_URL=http://logger.home.localnet:3100
+    restart: unless-stopped
 volumes:
   data-volume:
   
